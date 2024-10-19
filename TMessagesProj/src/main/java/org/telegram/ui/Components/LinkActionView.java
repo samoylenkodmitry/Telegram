@@ -72,6 +72,7 @@ public class LinkActionView extends LinearLayout {
 
     private boolean revoked;
     private boolean permanent;
+    private final boolean showQrButton;
     boolean loadingImporters;
     private QRCodeBottomSheet qrCodeBottomSheet;
     private boolean hideRevokeOption;
@@ -80,10 +81,16 @@ public class LinkActionView extends LinearLayout {
     private final float[] point = new float[2];
 
     public LinkActionView(Context context, BaseFragment fragment, BottomSheet bottomSheet, long chatId, boolean permanent, boolean isChannel) {
+        this(context, fragment, bottomSheet, chatId, permanent, isChannel, false);
+    }
+    
+    public LinkActionView(Context context, BaseFragment fragment, BottomSheet bottomSheet, long chatId, boolean permanent,
+        boolean isChannel, boolean showQrButton) {
         super(context);
         this.fragment = fragment;
         this.permanent = permanent;
         this.isChannel = isChannel;
+        this.showQrButton = showQrButton;
 
         setOrientation(VERTICAL);
         frameLayout = new FrameLayout(context);
@@ -96,10 +103,10 @@ public class LinkActionView extends LinearLayout {
         int containerPadding = 4;
         frameLayout.addView(linkView);
         optionsView = new ImageView(context);
-        optionsView.setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_ab_other));
-        optionsView.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
+        optionsView.setImageDrawable(ContextCompat.getDrawable(context, showQrButton ? R.drawable.msg_qrcode : R.drawable.ic_ab_other));
+        optionsView.setContentDescription(LocaleController.getString(showQrButton? R.string.GetQRCode : R.string.AccDescrMoreOptions));
         optionsView.setScaleType(ImageView.ScaleType.CENTER);
-        frameLayout.addView(optionsView, LayoutHelper.createFrame(40, 48, Gravity.RIGHT | Gravity.CENTER_VERTICAL));
+        frameLayout.addView(optionsView, LayoutHelper.createFrame(showQrButton ? 48 : 40, 48, Gravity.RIGHT | Gravity.CENTER_VERTICAL));
         addView(frameLayout, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, containerPadding, 0, containerPadding, 0));
 
         LinearLayout linearLayout = new LinearLayout(context);
@@ -219,6 +226,10 @@ public class LinkActionView extends LinearLayout {
         });
 
         optionsView.setOnClickListener(view -> {
+            if (showQrButton) {
+                showQrCode();
+                return;
+            }
             if (actionBarPopupWindow != null) {
                 return;
             }
@@ -456,7 +467,8 @@ public class LinkActionView extends LinearLayout {
         if (hideRevokeOption != b) {
             hideRevokeOption = b;
             optionsView.setVisibility(View.VISIBLE);
-            optionsView.setImageDrawable(ContextCompat.getDrawable(optionsView.getContext(), R.drawable.ic_ab_other));
+            optionsView.setImageDrawable(ContextCompat.getDrawable(optionsView.getContext(), 
+                showQrButton ? R.drawable.msg_qrcode : R.drawable.ic_ab_other));
         }
     }
 

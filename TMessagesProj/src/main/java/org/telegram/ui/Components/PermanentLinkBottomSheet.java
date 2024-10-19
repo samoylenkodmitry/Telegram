@@ -67,7 +67,7 @@ public class PermanentLinkBottomSheet extends BottomSheet {
         closeView.setPadding(closeViewPadding, closeViewPadding, closeViewPadding, closeViewPadding);
         frameLayout.addView(closeView, LayoutHelper.createFrame(36, 36, Gravity.TOP | Gravity.END, 6, 8, 8, 0));
 
-        linkActionView = new LinkActionView(context, fragment, this, chatId, true, isChannel);
+        linkActionView = new LinkActionView(context, fragment, this, chatId, true, isChannel, true);
         linkActionView.setPermanent(true);
         imageView = new RLottieImageView(context);
         linkIcon = new RLottieDrawable(R.raw.shared_link_enter, "" + R.raw.shared_link_enter, AndroidUtilities.dp(90), AndroidUtilities.dp(90), false, null);
