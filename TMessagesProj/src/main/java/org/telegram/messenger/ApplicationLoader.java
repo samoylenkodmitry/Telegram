@@ -34,6 +34,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.multidex.MultiDex;
 
+import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 
@@ -302,6 +303,7 @@ public class ApplicationLoader extends Application {
 
         LauncherIconController.tryFixLauncherIconIfNeeded();
         ProxyRotationController.init();
+        CastContext.getSharedInstance(this);
     }
 
     public static void startPushService() {

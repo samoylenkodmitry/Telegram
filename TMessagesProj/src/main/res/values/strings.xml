@@ -7326,6 +7326,7 @@
     <string name="FilterExistingChats">Existing chats</string>
     <string name="FilterNewChats">New chats</string>
     <string name="MessageBizBot">Only you can see that this message is sent by **bot**.</string>
+    <string name="HintStartBot">Tap here to use this bot</string>
     <string name="FragmentUsernameTitle">**%s** is a collectible username that belongs to</string>
     <string name="FragmentUsernameMessage">This username was bought on **Fragment** on %1$s for **%2$s** %3$s</string>
     <string name="FragmentUsernameOpen">Learn More</string>

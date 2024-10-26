@@ -16,8 +16,11 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentManager;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -36,15 +39,30 @@ import android.transition.TransitionManager;
 import android.transition.TransitionSet;
 import android.transition.TransitionValues;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
+import android.view.ViewStub;
 import android.view.animation.Interpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
+import com.google.android.gms.cast.framework.CastButtonFactory;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.core.graphics.ColorUtils;
+import androidx.fragment.app.FragmentActivity;
+import androidx.mediarouter.app.MediaRouteButton;
+import com.google.android.gms.cast.framework.CastContext;
+import com.google.android.gms.cast.framework.CastSession;
+import com.google.android.gms.cast.framework.SessionManagerListener;
+import com.google.android.gms.cast.framework.media.widget.MiniControllerFragment;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.tasks.Task;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -62,6 +80,8 @@ import org.telegram.ui.Components.SizeNotifierFrameLayout;
 import org.telegram.ui.Components.SnowflakesEffect;
 
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ActionBar extends FrameLayout {
 
@@ -154,7 +174,60 @@ public class ActionBar extends FrameLayout {
     Rect rectTmp = new Rect();
 
     EllipsizeSpanAnimator ellipsizeSpanAnimator = new EllipsizeSpanAnimator(this);
+    private MediaRouteButton castButton;
+    private FrameLayout miniControllerContainer;
+    private SessionManagerListener<CastSession> sessionManagerListener = new SessionManagerListener<CastSession>() {
+        @Override
+        public void onSessionStarted(CastSession session, String sessionId) {
+            android.util.Log.d("Cast", "onSessionStarted: " + sessionId);
+            showMiniControllerFragment();
+        }
 
+        @Override
+        public void onSessionStarting(@NonNull CastSession castSession) {
+
+        }
+
+        @Override
+        public void onSessionSuspended(@NonNull CastSession castSession, int i) {
+
+        }
+
+        @Override
+        public void onSessionEnded(CastSession session, int error) {
+            android.util.Log.d("Cast", "onSessionEnded: " + error);
+            removeMiniControllerFragment();
+        }
+
+        @Override
+        public void onSessionEnding(@NonNull CastSession castSession) {
+
+        }
+
+        @Override
+        public void onSessionResumeFailed(@NonNull CastSession castSession, int i) {
+
+        }
+
+        @Override
+        public void onSessionResumed(@NonNull CastSession castSession, boolean b) {
+
+        }
+
+        @Override
+        public void onSessionResuming(@NonNull CastSession castSession, @NonNull String s) {
+
+        }
+
+        @Override
+        public void onSessionStartFailed(@NonNull CastSession castSession, int i) {
+
+        }
+
+    };
+    private CastContext castContext;
+    private View miniControllerView;
+    
     public ActionBar(Context context) {
         this(context, null);
     }
@@ -170,8 +243,74 @@ public class ActionBar extends FrameLayout {
                 titleActionRunnable.run();
             }
         });
+        Context ctx = getThemeOverriddenContext(context, Theme.getCurrentNightTheme() != Theme.getCurrentTheme());
+        castButton = new MediaRouteButton(ctx);
+        CastButtonFactory.setUpMediaRouteButton(ctx, castButton);
+        LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        layoutParams.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+        castButton.setLayoutParams(layoutParams);
+        addView(castButton, layoutParams);
+        miniControllerContainer = new FrameLayout(ctx);
+        miniControllerContainer.setVisibility(View.GONE);
+        addView(miniControllerContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        Task<CastContext> castContextTask = CastContext.getSharedInstance(this.getContext(), Executors.newSingleThreadExecutor());
+        castContextTask.addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                castContext = task.getResult();
+                castContext.getSessionManager().addSessionManagerListener(sessionManagerListener, CastSession.class);
+                showMiniControllerFragment();
+            }
+        });
     }
 
+    public static Context getThemeOverriddenContext(Context originalContext, boolean forceLightTheme) {
+        ContextThemeWrapper newContext = new ContextThemeWrapper(originalContext,
+                forceLightTheme ? androidx.appcompat.R.style.Theme_AppCompat_Light
+                        : androidx.appcompat.R.style.Theme_AppCompat);
+        int overlayResId = forceLightTheme ?
+                androidx.appcompat.R.style.ThemeOverlay_AppCompat_Light :
+                androidx.appcompat.R.style.ThemeOverlay_AppCompat_Dark;
+        newContext.getTheme().applyStyle(overlayResId, true);
+        return newContext;
+    }
+
+    private void showMiniControllerFragment() {
+        if (castContext == null || castContext.getSessionManager().getCurrentCastSession() == null) return;
+        if (miniControllerView != null && miniControllerView.getParent() != null) {
+            miniControllerView.setVisibility(View.VISIBLE);
+        } else {
+            try {
+                miniControllerView = LayoutInflater.from(getContext()).inflate(R.layout.cast_mini_controller_fragment, null);
+                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+                miniControllerContainer.addView(miniControllerView, lp);
+                miniControllerView.setVisibility(View.VISIBLE);
+                miniControllerContainer.setVisibility(View.VISIBLE);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        requestLayout();
+        postInvalidate();
+    }
+
+    private void removeMiniControllerFragment() {
+        miniControllerContainer.setVisibility(View.GONE);
+        if (miniControllerView != null) {
+            miniControllerView.setVisibility(View.GONE);
+        }
+        miniControllerContainer.setBackgroundColor(Color.BLACK);
+        miniControllerContainer.removeView(miniControllerView);
+        miniControllerView = null;
+        FragmentManager fragmentManager = ((FragmentActivity) getContext()).getFragmentManager();
+        for (Object f : fragmentManager.getFragments()) {
+            if (f instanceof MiniControllerFragment) {
+                fragmentManager.beginTransaction().remove((Fragment) f).commit();
+            }
+        }
+        requestLayout();
+        postInvalidate();
+    }
+    
     public INavigationLayout.BackButtonState getBackButtonState() {
         if (backButtonDrawable instanceof INavigationLayout.IBackButtonDrawable) {
             return ((INavigationLayout.IBackButtonDrawable) backButtonDrawable).getBackButtonState();
@@ -1219,8 +1358,13 @@ public class ActionBar extends FrameLayout {
             actionMode.setPadding(0, occupyStatusBar ? AndroidUtilities.statusBarHeight : 0, 0, 0);
         }
         ignoreLayoutRequest = false;
+        int castHeight = 0;
+        if (miniControllerContainer.getVisibility() != GONE && miniControllerView != null && miniControllerView.getVisibility() != GONE) {
+            miniControllerContainer.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(54), MeasureSpec.EXACTLY));
+            castHeight = dp(54);
+        }
 
-        setMeasuredDimension(width, actionBarHeight + (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0) + extraHeight);
+        setMeasuredDimension(width, actionBarHeight + (occupyStatusBar ? AndroidUtilities.statusBarHeight : 0) + extraHeight + castHeight);
 
         int textLeft;
         if (backButtonImageView != null && backButtonImageView.getVisibility() != GONE) {
@@ -1314,7 +1458,7 @@ public class ActionBar extends FrameLayout {
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
             View child = getChildAt(i);
-            if (child.getVisibility() == GONE || child == titleTextView[0] || child == titleTextView[1] || child == subtitleTextView || child == menu || child == backButtonImageView || child == additionalSubtitleTextView || child == avatarSearchImageView) {
+            if (child.getVisibility() == GONE || child == miniControllerContainer || child == titleTextView[0] || child == titleTextView[1] || child == subtitleTextView || child == menu || child == backButtonImageView || child == additionalSubtitleTextView || child == avatarSearchImageView) {
                 continue;
             }
             measureChildWithMargins(child, widthMeasureSpec, 0, MeasureSpec.makeMeasureSpec(getMeasuredHeight(), MeasureSpec.EXACTLY), 0);
@@ -1340,6 +1484,18 @@ public class ActionBar extends FrameLayout {
         if (menu != null && menu.getVisibility() != GONE) {
             int menuLeft = menu.searchFieldVisible() ? dp(AndroidUtilities.isTablet() ? 74 : 66) : (right - left) - menu.getMeasuredWidth();
             menu.layout(menuLeft, additionalTop, menuLeft + menu.getMeasuredWidth(), additionalTop + menu.getMeasuredHeight());
+        }
+
+        if (castButton != null && castButton.getVisibility() != GONE && !menu.searchFieldVisible()) {
+            castButton.layout(
+                right - left - castButton.getMeasuredWidth() + dp(8) - menu.getMeasuredWidth(),
+                additionalTop + dp(16),
+                right - left - menu.getMeasuredWidth(),
+                additionalTop + castButton.getMeasuredHeight());
+        }
+        
+        if (miniControllerContainer.getVisibility() != GONE && miniControllerView != null && miniControllerView.getVisibility() != GONE) {
+            miniControllerContainer.layout(0, bottom - top - dp(56), right - left, bottom - top);
         }
 
         for (int i = 0; i < 2; i++) {
@@ -1379,7 +1535,8 @@ public class ActionBar extends FrameLayout {
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
             View child = getChildAt(i);
-            if (child.getVisibility() == GONE || child == titleTextView[0] || child == titleTextView[1] || child == subtitleTextView || child == menu || child == backButtonImageView || child == additionalSubtitleTextView || child == avatarSearchImageView) {
+            if (child.getVisibility() == GONE || child == castButton ||
+                child == titleTextView[0] || child == titleTextView[1] || child == miniControllerContainer || child == subtitleTextView || child == menu || child == backButtonImageView || child == additionalSubtitleTextView || child == avatarSearchImageView) {
                 continue;
             }
 
@@ -1731,6 +1888,7 @@ public class ActionBar extends FrameLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        showMiniControllerFragment();
         attached = true;
         updateAttachState();
         if (SharedConfig.noStatusBar && actionModeVisible) {
@@ -1747,6 +1905,7 @@ public class ActionBar extends FrameLayout {
 
     @Override
     protected void onDetachedFromWindow() {
+        removeMiniControllerFragment();
         super.onDetachedFromWindow();
         attached = false;
         updateAttachState();
