@@ -2901,6 +2901,15 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
                         }
                         showDialog(ShareAlert.createShareAlert(mContext, cell.getMessageObject(), null, ChatObject.isChannel(currentChat) && !currentChat.megagroup, null, false));
                     }
+                    
+                    @Override
+                    public void didLongPressSideButton(ChatMessageCell cell, float x, float y) {
+                        new Exception("xoxoxo").printStackTrace();
+                        if (getParentActivity() == null) {
+                            return;
+                        }
+                        showDialog(ShareAlert.createShareAlert(mContext, cell.getMessageObject(), null, ChatObject.isChannel(currentChat) && !currentChat.megagroup, null, false));
+                    }
 
                     @Override
                     public boolean needPlayMessage(ChatMessageCell cell, MessageObject messageObject, boolean muted) {

@@ -132,7 +132,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
     public FrameLayout bulletinContainer2;
     private LinearLayout sharesCountLayout;
     private AnimatorSet animatorSet;
-    private RecyclerListView topicsGridView;
+    public RecyclerListView topicsGridView;
     private RecyclerListView gridView;
     private RecyclerListView searchGridView;
     private GridLayoutManager layoutManager;
@@ -481,6 +481,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
         super(context, true, resourcesProvider);
         this.resourcesProvider = resourcesProvider;
         this.includeStory = includeStory;
+        new Exception("xoxoxo)").printStackTrace();
 
         parentActivity = AndroidUtilities.findActivity(context);
 
