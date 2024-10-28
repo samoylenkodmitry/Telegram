@@ -275,6 +275,7 @@ public class ActionBar extends FrameLayout {
     }
 
     private void showMiniControllerFragment() {
+        if (true) return;
         if (castContext == null || castContext.getSessionManager().getCurrentCastSession() == null) return;
         if (miniControllerView != null && miniControllerView.getParent() != null) {
             miniControllerView.setVisibility(View.VISIBLE);
@@ -294,6 +295,7 @@ public class ActionBar extends FrameLayout {
     }
 
     private void removeMiniControllerFragment() {
+        if (true) return;
         miniControllerContainer.setVisibility(View.GONE);
         if (miniControllerView != null) {
             miniControllerView.setVisibility(View.GONE);
@@ -1486,11 +1488,12 @@ public class ActionBar extends FrameLayout {
             menu.layout(menuLeft, additionalTop, menuLeft + menu.getMeasuredWidth(), additionalTop + menu.getMeasuredHeight());
         }
 
-        if (castButton != null && castButton.getVisibility() != GONE && !menu.searchFieldVisible()) {
+        if (castButton != null && castButton.getVisibility() != GONE && (menu == null || !menu.searchFieldVisible())) {
+            int menuWidth = menu != null ? menu.getMeasuredWidth() : 0;
             castButton.layout(
-                right - left - castButton.getMeasuredWidth() + dp(8) - menu.getMeasuredWidth(),
+                right - left - castButton.getMeasuredWidth() + dp(8) - menuWidth,
                 additionalTop + dp(16),
-                right - left - menu.getMeasuredWidth(),
+                right - left - menuWidth,
                 additionalTop + castButton.getMeasuredHeight());
         }
         
