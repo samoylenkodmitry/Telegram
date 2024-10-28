@@ -64,10 +64,7 @@ public class ShareLayout extends FrameLayout implements NotificationCenter.Notif
     boolean darkTheme = false;
     ShareDialogsAdapter listAdapter;
     private View currentHoverCell;
-    private boolean isTrackingStarted;
     private WindowManager.LayoutParams windowParams;
-    private WindowManager windowManager;
-    private View touchInterceptor;
     public ShareLayout(@NonNull Context context, Theme.ResourcesProvider resourcesProvider, MessageObject messageObject, ChatActivity parentFragment) {
         super(context);
         this.resourcesProvider = resourcesProvider;
@@ -199,106 +196,42 @@ public class ShareLayout extends FrameLayout implements NotificationCenter.Notif
         
         setPadding(dp(2), dp(4), dp(4), dp(2));
         setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)));
+    }
 
+    public void dispatchMotionEvent(MotionEvent event) {
+        if (!isAttachedToWindow()) return;
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                processTouch(event.getRawX(), event.getRawY());
+                break;
 
+            case MotionEvent.ACTION_MOVE:
+                processTouch(event.getRawX(), event.getRawY());
+                break;
 
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
 
-        touchInterceptor = new View(context);
-        touchInterceptor.setBackgroundColor(Color.TRANSPARENT);
-        windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+                if (currentHoverCell != null) {
+                    View lastCell = currentHoverCell;
+                    animateHoverScale(currentHoverCell, 1f);
+                    currentHoverCell = null;
 
-        windowParams = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_PANEL,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSPARENT
-        );
-
-        // Get window token from parent activity
-        Activity activity = (Activity) context;
-        windowParams.token = activity.getWindow().getDecorView().getWindowToken();
-
-        touchInterceptor.setOnTouchListener(new OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                AndroidUtilities.runOnUIThread(() -> {
-                    android.util.Log.d("ShareLayout", "1 onTouch " + event.getAction());
-                    switch (event.getAction()) {
-                        case MotionEvent.ACTION_DOWN:
-                            if (!isTrackingStarted) {
-                                isTrackingStarted = true;
-                                windowParams.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-                                windowManager.updateViewLayout(touchInterceptor, windowParams);
-                                processTouch(event.getRawX(), event.getRawY());
-                            }
-                            break;
-
-                        case MotionEvent.ACTION_MOVE:
-                            if (isTrackingStarted) {
-                                processTouch(event.getRawX(), event.getRawY());
-                            }
-                            break;
-
-                        case MotionEvent.ACTION_UP:
-                        case MotionEvent.ACTION_CANCEL:
-                            if (isTrackingStarted) {
-                                isTrackingStarted = false;
-                                windowParams.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-                                windowManager.updateViewLayout(touchInterceptor, windowParams);
-
-                                if (currentHoverCell != null) {
-                                    View lastCell = currentHoverCell;
-                                    animateHoverScale(currentHoverCell, 1f);
-                                    currentHoverCell = null;
-
-                                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                                        float[] point = mapPointToRecyclerView(event.getRawX(), event.getRawY());
-                                        View clickedView = gridView.findChildViewUnder(point[0], point[1]);
-                                        if (clickedView == lastCell) {
-                                            int position = gridView.getChildAdapterPosition(clickedView);
-                                            if (position >= 0) {
-                                                TLRPC.Dialog dialog = listAdapter.getItem(position);
-                                                if (dialog != null) {
-                                                    selectDialog(clickedView, dialog);
-                                                }
-                                            }
-                                        }
-                                    }
+                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                        float[] point = mapPointToRecyclerView(event.getRawX(), event.getRawY());
+                        View clickedView = gridView.findChildViewUnder(point[0], point[1]);
+                        if (clickedView == lastCell) {
+                            int position = gridView.getChildAdapterPosition(clickedView);
+                            if (position >= 0) {
+                                TLRPC.Dialog dialog = listAdapter.getItem(position);
+                                if (dialog != null) {
+                                    selectDialog(clickedView, dialog);
                                 }
                             }
-                            break;
+                        }
                     }
-                });
-                return true;
-            }
-        });
-    }
-
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        try {
-            android.util.Log.d("ShareLayout", "onAttachedToWindow");
-            windowManager.addView(touchInterceptor, windowParams);
-        } catch (Exception e) {
-            e.printStackTrace();
-            FileLog.e(e);
-        }
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        try {
-            android.util.Log.d("ShareLayout", "onDetachedFromWindow");
-            windowManager.removeView(touchInterceptor);
-        } catch (Exception e) {
-            e.printStackTrace();
-            FileLog.e(e);
+                }
+                break;
         }
     }
 
@@ -315,28 +248,88 @@ public class ShareLayout extends FrameLayout implements NotificationCenter.Notif
             View newHoverCell = gridView.findChildViewUnder(point[0], point[1]);
 
             if (newHoverCell != currentHoverCell) {
-                // Scale down previous cell
+                // Reset all cells to normal state
+                for (int i = 0; i < gridView.getChildCount(); i++) {
+                    View child = gridView.getChildAt(i);
+                    if (child != newHoverCell && child instanceof ShareDialogCell) {
+                        animateToTargetValues(child, 1f, 0.5f);
+                    }
+                }
+
+                // Reset previous cell
                 if (currentHoverCell != null) {
-                    animateHoverScale(currentHoverCell, 1f);
+                    animateToTargetValues(currentHoverCell, 1f, 0.5f);
                 }
 
                 // Scale up new cell if it's valid
                 if (newHoverCell instanceof ShareDialogCell) {
                     currentHoverCell = newHoverCell;
-                    animateHoverScale(currentHoverCell, 1.05f);
+                    animateToTargetValues(currentHoverCell, 1.15f, 1f);
                 } else {
                     currentHoverCell = null;
                 }
             }
         } else {
-            // Point is outside RecyclerView, scale down current cell if any
-            if (currentHoverCell != null) {
-                animateHoverScale(currentHoverCell, 1f);
-                currentHoverCell = null;
+            // Point is outside RecyclerView, reset all cells
+            for (int i = 0; i < gridView.getChildCount(); i++) {
+                View child = gridView.getChildAt(i);
+                if (child instanceof ShareDialogCell) {
+                    animateToTargetValues(child, 1f, 1f);
+                }
             }
+            currentHoverCell = null;
+        }
+        
+        if (currentHoverCell != null) {
+            View nameView = ((ShareDialogCell) currentHoverCell).nameTextView;
         }
 
         return true;
+    }
+
+    private void animateToTargetValues(View view, float targetScale, float targetAlpha) {
+        if (view == null) return;
+
+        float currentScale = view.getScaleX(); // Assuming X and Y scales are always the same
+        float currentAlpha = view.getAlpha();
+
+        // Only animate if we haven't reached target values
+        if (currentScale != targetScale || currentAlpha != targetAlpha) {
+            // If animation is already running towards these values, let it continue
+            if (view.getTag(R.id.tag_scale) == null ||
+                    (float)view.getTag(R.id.tag_scale) != targetScale ||
+                    (float)view.getTag(R.id.tag_alpha) != targetAlpha) {
+
+                // Store target values to check in future calls
+                view.setTag(R.id.tag_scale, targetScale);
+                view.setTag(R.id.tag_alpha, targetAlpha);
+
+                view.animate()
+                        .scaleX(targetScale)
+                        .scaleY(targetScale)
+                        .alpha(targetAlpha)
+                        .setDuration(250)
+                        .setInterpolator(CubicBezierInterpolator.DEFAULT)
+                        .setUpdateListener(animation -> {
+                            // Clear tags when animation completes
+                            if (animation.getAnimatedFraction() >= 1f) {
+                                view.setTag(R.id.tag_scale, null);
+                                view.setTag(R.id.tag_alpha, null);
+                            }
+                        });
+            }
+        }
+    }
+
+    private void animateHoverScale(View view, float scale) {
+        if (view == null) return;
+        view.animate()
+                .scaleX(scale)
+                .scaleY(scale)
+                .alpha(scale == 1f ? 1f : 0.5f)
+                .setDuration(350)
+                .setInterpolator(CubicBezierInterpolator.DEFAULT)
+                .start();
     }
 
     private float[] mapPointToRecyclerView(float rawX, float rawY) {
@@ -348,17 +341,6 @@ public class ShareLayout extends FrameLayout implements NotificationCenter.Notif
         };
     }
 
-    private void animateHoverScale(View view, float scale) {
-        if (view == null) return;
-
-        view.animate().cancel();
-        view.animate()
-                .scaleX(scale)
-                .scaleY(scale)
-                .setDuration(150)
-                .setInterpolator(CubicBezierInterpolator.DEFAULT)
-                .start();
-    }
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         GradientDrawable background = (GradientDrawable) getBackground();
@@ -368,30 +350,6 @@ public class ShareLayout extends FrameLayout implements NotificationCenter.Notif
     
     private RecyclerListView getMainGridView() {
         return gridView;
-    }
-    private void invalidateTopicsAnimation(View cell, int[] loc, float value) {
-        RecyclerListView mainGridView = getMainGridView();
-        mainGridView.setPivotX(cell.getX() + cell.getWidth() / 2f);
-        mainGridView.setPivotY(cell.getY() + cell.getHeight() / 2f);
-        mainGridView.setScaleX(1f + value * 0.25f);
-        mainGridView.setScaleY(1f + value * 0.25f);
-        mainGridView.setAlpha(1f - value);
-
-        float moveValue = CubicBezierInterpolator.EASE_OUT.getInterpolation(value);
-        for (int i = 0; i < mainGridView.getChildCount(); i++) {
-            View v = mainGridView.getChildAt(i);
-            if (v instanceof ShareDialogCell) {
-                v.setTranslationX((v.getX() - cell.getX()) * 0.5f * moveValue);
-                v.setTranslationY((v.getY() - cell.getY()) * 0.5f * moveValue);
-
-                if (v != cell) {
-                    v.setAlpha(1f - Math.min(value, 0.5f) / 0.5f);
-                } else {
-                    v.setAlpha(1f - value);
-                }
-            }
-        }
-        mainGridView.invalidate();
     }
 
     @Override
@@ -403,7 +361,6 @@ public class ShareLayout extends FrameLayout implements NotificationCenter.Notif
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.dialogsNeedReload);
         }
     }
-
 
     private class ShareDialogsAdapter extends RecyclerListView.SelectionAdapter {
 

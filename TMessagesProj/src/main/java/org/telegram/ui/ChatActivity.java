@@ -893,6 +893,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private int popupAnimationIndex = -1;
     private AnimatorSet scrimAnimatorSet;
     public ActionBarPopupWindow scrimPopupWindow;
+    public ShareLayout quickShareLayout;
     private boolean scrimPopupWindowHideDimOnDismiss = true;
     private int scrimPopupX, scrimPopupY;
     private ActionBarMenuSubItem[] scrimPopupWindowItems;
@@ -16054,6 +16055,9 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
 
         @Override
         public boolean dispatchTouchEvent(MotionEvent ev) {
+            if (quickShareLayout != null) {
+                quickShareLayout.dispatchMotionEvent(ev);
+            }
             float expandY;
             if (AndroidUtilities.isInMultiwindow || isInBubbleMode()) {
                 expandY = chatActivityEnterView.getEmojiView() != null ? chatActivityEnterView.getEmojiView().getY() : chatActivityEnterView.getY();
@@ -30022,6 +30026,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private ValueAnimator scrimViewAlphaAnimator;
 
     private void closeMenu(boolean hideDim) {
+        quickShareLayout = null;
         scrimPopupWindowHideDimOnDismiss = hideDim;
         if (scrimPopupWindow != null) {
             scrimPopupWindow.dismiss();
@@ -35478,14 +35483,15 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                     }
                 });
 
-                ShareLayout shareLayout = new ShareLayout(contentView.getContext(), themeDelegate, messageObject, ChatActivity.this) {
+                quickShareLayout = new ShareLayout(contentView.getContext(), themeDelegate, messageObject, ChatActivity.this) {
 
                     @Override
                     public void onSend() {
                         closeMenu();
                     }
                 };
-                scrimPopupContainerLayout.addView(shareLayout, LayoutHelper.createLinearRelatively(LayoutHelper.WRAP_CONTENT, dp(45), Gravity.LEFT, 0, 0, 0, 0));
+                scrimPopupContainerLayout.addView(quickShareLayout, LayoutHelper.createLinearRelatively(LayoutHelper.WRAP_CONTENT, dp(45), Gravity.LEFT, 0, 0, 0, 0));
+                scrimPopupContainerLayout.setClipToOutline(false);
 
                 scrimPopupWindow = new ActionBarPopupWindow(scrimPopupContainerLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT) {
                     @Override
@@ -35520,7 +35526,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                 scrimPopupWindow.setPauseNotifications(true);
                 scrimPopupWindow.setDismissAnimationDuration(220);
                 scrimPopupWindow.setOutsideTouchable(true);
-                scrimPopupWindow.setClippingEnabled(true);
+                scrimPopupWindow.setClippingEnabled(false);
                 boolean isReactionsAvailable = true;
                     scrimPopupWindow.setAnimationStyle(R.style.PopupContextAnimation);
                 scrimPopupWindow.setFocusable(true);

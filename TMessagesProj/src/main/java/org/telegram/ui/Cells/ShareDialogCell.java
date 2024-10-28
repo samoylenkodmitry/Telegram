@@ -65,7 +65,7 @@ import org.telegram.ui.Components.RLottieDrawable;
 public class ShareDialogCell extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
 
     private final BackupImageView imageView;
-    private final TextView nameTextView;
+    public final TextView nameTextView;
     private final SimpleTextView topicTextView;
     private final CheckBox2 checkBox;
     private final AvatarDrawable avatarDrawable = new AvatarDrawable() {
